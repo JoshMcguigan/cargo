@@ -221,6 +221,65 @@ fn force_rebuild_displays_error() {
         .run();
 }
 
+// Confirm that force rebuild works correctly with dependencies which are also a target
+#[test]
+fn check_force_rebuild_with_workspace_dependencies() {
+    let p = project()
+        .file(
+            "Cargo.toml",
+            r#"
+            [workspace]
+            members = ["a", "b", "c", "d", "e", "f"]
+        "#,
+        )
+        .file(
+            "a/Cargo.toml",
+            r#"
+            [package]
+            name = "a"
+            version = "0.1.0"
+
+            [dependencies]
+            b = { path = "../b" }
+            c = { path = "../c" }
+            d = { path = "../d" }
+            e = { path = "../e" }
+            f = { path = "../f" }
+        "#,
+        )
+        .file("a/src/lib.rs", "")
+        .file("b/Cargo.toml", &basic_manifest("b", "0.0.1"))
+        .file("b/src/lib.rs", "")
+        .file("c/Cargo.toml", &basic_manifest("c", "0.0.1"))
+        .file("c/src/lib.rs", "")
+        .file("d/Cargo.toml", &basic_manifest("d", "0.0.1"))
+        .file("d/src/lib.rs", "")
+        .file("e/Cargo.toml", &basic_manifest("e", "0.0.1"))
+        .file("e/src/lib.rs", "")
+        .file("f/Cargo.toml", &basic_manifest("f", "0.0.1"))
+        .file("f/src/lib.rs", "")
+        .build();
+
+    p.cargo("check --all")
+        .with_stderr_contains("[CHECKING] a [..]")
+        .with_stderr_contains("[CHECKING] b [..]")
+        .with_stderr_contains("[CHECKING] c [..]")
+        .with_stderr_contains("[CHECKING] d [..]")
+        .with_stderr_contains("[CHECKING] e [..]")
+        .with_stderr_contains("[CHECKING] f [..]")
+        .run();
+
+    p.cargo("check --all -Z unstable-options --force-rebuild")
+        .masquerade_as_nightly_cargo()
+        .with_stderr_contains("[CHECKING] a [..]")
+        .with_stderr_contains("[CHECKING] b [..]")
+        .with_stderr_contains("[CHECKING] c [..]")
+        .with_stderr_contains("[CHECKING] d [..]")
+        .with_stderr_contains("[CHECKING] e [..]")
+        .with_stderr_contains("[CHECKING] f [..]")
+        .run();
+}
+
 // Checks that where a project has both a lib and a bin, the lib is only checked
 // not built.
 #[test]

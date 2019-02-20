@@ -129,6 +129,7 @@ fn compile<'a, 'cfg: 'a>(
     jobs: &mut JobQueue<'a, 'cfg>,
     plan: &mut BuildPlan,
     unit: &Unit<'a>,
+    units: &[Unit<'a>],
     exec: &Arc<dyn Executor>,
     force_rebuild: bool,
 ) -> CargoResult<()> {
@@ -176,8 +177,12 @@ fn compile<'a, 'cfg: 'a>(
     drop(p);
 
     // Be sure to compile all dependencies of this target as well.
-    for unit in cx.dep_targets(unit).iter() {
-        compile(cx, jobs, plan, unit, exec, false)?;
+    // But skip any units which were already selected in order to ensure the correct value is set
+    //     for force_rebuild
+    for unit in cx.dep_targets(unit).iter()
+        .filter(|&u| !units.contains(u))
+    {
+        compile(cx, jobs, plan, unit, units, exec, false)?;
     }
     if build_plan {
         plan.add(cx, unit)?;
